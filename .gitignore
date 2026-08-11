@@ -1,0 +1,17 @@
+# Dataset
+data/raw/
+
+# Trained ML models
+detection/models/*.pkl
+
+# SQLite database
+backend/*.db
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# IDE
+.vscode/
+.idea/
