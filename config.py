@@ -10,7 +10,8 @@ import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 RAW_DATA_DIR = os.path.join(BASE_DIR, "data", "raw", "MachineLearningCVE")
-SAMPLE_DATA_DIR = os.path.join(BASE_DIR, "data", "sample")
+PROCESSED_DIR = os.path.join(BASE_DIR, "data", "processed")
+SAMPLE_DIR = os.path.join(BASE_DIR, "data", "sample")
 MODEL_PATH = os.path.join(BASE_DIR, "detection", "models", "model.pkl")
 DB_PATH = os.path.join(BASE_DIR, "backend", "ips.db")
 
