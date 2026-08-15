@@ -41,28 +41,56 @@ def init_db():
 
     conn.commit()
     conn.close()
+
     print(f"Database initialized at {DB_PATH}")
 
 
-def log_result(source_ip, true_label, predicted_class, confidence,
-                is_anomaly, anomaly_score, risk_score, action, reason):
-    conn = get_connection()
+def log_result(
+    conn,
+    source_ip,
+    true_label,
+    predicted_class,
+    confidence,
+    is_anomaly,
+    anomaly_score,
+    risk_score,
+    action,
+    reason
+):
     cur = conn.cursor()
+
     cur.execute("""
         INSERT INTO traffic_log
-            (source_ip, true_label, predicted_class, confidence,
-             is_anomaly, anomaly_score, risk_score, action, reason)
+            (
+                source_ip,
+                true_label,
+                predicted_class,
+                confidence,
+                is_anomaly,
+                anomaly_score,
+                risk_score,
+                action,
+                reason
+            )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (source_ip, true_label, predicted_class, confidence,
-          int(is_anomaly), anomaly_score, risk_score, action, reason))
+    """, (
+        source_ip,
+        true_label,
+        predicted_class,
+        confidence,
+        int(is_anomaly),
+        anomaly_score,
+        risk_score,
+        action,
+        reason
+    ))
 
     if action == "BLOCK":
         cur.execute("""
-            INSERT INTO blocklist_log (source_ip, reason) VALUES (?, ?)
+            INSERT INTO blocklist_log
+                (source_ip, reason)
+            VALUES (?, ?)
         """, (source_ip, reason))
-
-    conn.commit()
-    conn.close()
 
 
 if __name__ == "__main__":
