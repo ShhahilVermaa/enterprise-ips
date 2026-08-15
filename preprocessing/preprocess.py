@@ -53,7 +53,7 @@ def clean_features(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def simulate_source_ips(df: pd.DataFrame, n_unique_ips: int = 500) -> pd.Series:
+def simulate_source_ips(df: pd.DataFrame, n_unique_ips: int = 20000) -> pd.Series:
     """
     This dataset (MachineLearningCVE) does not include real IP addresses --
     they're stripped for privacy in the pre-extracted flow-feature CSVs.

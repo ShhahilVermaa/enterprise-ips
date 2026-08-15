@@ -9,7 +9,7 @@ from common.schemas import TrafficFeatures
 from detection.predict import predict
 from prevention.risk_scorer import score_and_decide
 from prevention.blocklist_manager import reset_blocklist
-from backend.database import init_db, log_result
+from backend.database import init_db, log_result, get_connection
 
 LABEL_COLUMN = "Label"
 IP_COLUMN = "Source IP"
@@ -27,42 +27,64 @@ def run(data_path: str = None):
     df = pd.read_csv(data_path)
     print(f"Processing {len(df):,} records...")
 
+    # One SQLite connection for the entire pipeline run
+    conn = get_connection()
+
     blocked_count = 0
     allowed_count = 0
     anomaly_count = 0
 
     start_time = time.time()
 
-    for _, row in df.iterrows():
-        features = row.drop(labels=[LABEL_COLUMN, IP_COLUMN]).to_dict()
-        traffic = TrafficFeatures(
-            source_ip=row[IP_COLUMN],
-            features=features,
-            true_label=row[LABEL_COLUMN],
-        )
+    try:
+        for i, (_, row) in enumerate(df.iterrows()):
 
-        prediction = predict(traffic)
-        decision = score_and_decide(prediction, traffic.source_ip)
+            features = row.drop(labels=[LABEL_COLUMN, IP_COLUMN]).to_dict()
 
-        log_result(
-            source_ip=traffic.source_ip,
-            true_label=traffic.true_label,
-            predicted_class=prediction.predicted_class,
-            confidence=prediction.confidence,
-            is_anomaly=prediction.is_anomaly,
-            anomaly_score=prediction.anomaly_score,
-            risk_score=decision.risk_score,
-            action=decision.action,
-            reason=decision.reason,
-        )
+            traffic = TrafficFeatures(
+                source_ip=row[IP_COLUMN],
+                features=features,
+                true_label=row[LABEL_COLUMN],
+            )
 
-        if decision.action == "BLOCK":
-            blocked_count += 1
-        else:
-            allowed_count += 1
+            prediction = predict(traffic)
 
-        if prediction.is_anomaly:
-            anomaly_count += 1
+            decision = score_and_decide(
+                prediction,
+                traffic.source_ip
+            )
+
+            log_result(
+                conn,
+                source_ip=traffic.source_ip,
+                true_label=traffic.true_label,
+                predicted_class=prediction.predicted_class,
+                confidence=prediction.confidence,
+                is_anomaly=prediction.is_anomaly,
+                anomaly_score=prediction.anomaly_score,
+                risk_score=decision.risk_score,
+                action=decision.action,
+                reason=decision.reason,
+            )
+
+            if decision.action == "BLOCK":
+                blocked_count += 1
+            else:
+                allowed_count += 1
+
+            if prediction.is_anomaly:
+                anomaly_count += 1
+
+            # Commit every 5,000 records
+            if (i + 1) % 5000 == 0:
+                conn.commit()
+                print(f"  ...{i + 1:,} processed")
+
+        # Commit remaining records
+        conn.commit()
+
+    finally:
+        conn.close()
 
     elapsed = time.time() - start_time
     throughput = len(df) / elapsed if elapsed > 0 else 0
@@ -70,7 +92,10 @@ def run(data_path: str = None):
     print(f"\nDone in {elapsed:.2f}s")
     print(f"Throughput: {throughput:.1f} records/sec")
     print(f"Allowed: {allowed_count:,} | Blocked: {blocked_count:,}")
-    print(f"Flagged anomalous: {anomaly_count:,} ({anomaly_count/len(df):.1%})")
+    print(
+        f"Flagged anomalous: {anomaly_count:,} "
+        f"({anomaly_count / len(df):.1%})"
+    )
 
 
 if __name__ == "__main__":
