@@ -45,8 +45,6 @@ BLOCKLIST_EXPIRY_MINUTES = 60  # auto-unblock after this long
 # ── Detection model paths ──────────────────────────────
 ANOMALY_MODEL_PATH = os.path.join(BASE_DIR, "detection", "models", "anomaly_model.pkl")
 
-# ── Anomaly detection threshold ─────────────────────────
-ANOMALY_SCORE_THRESHOLD = -0.1   # Isolation Forest: scores below this = anomalous
 
 # ── Attack severity weights (used by Member 3's risk scoring) ──
 ATTACK_SEVERITY_WEIGHTS = {

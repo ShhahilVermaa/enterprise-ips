@@ -1,6 +1,7 @@
 # detection/train_model.py
 
 import os
+import numpy as np
 import pandas as pd
 from xgboost import XGBClassifier
 from sklearn.ensemble import IsolationForest
@@ -13,6 +14,7 @@ from config import PROCESSED_DIR, MODEL_PATH, ANOMALY_MODEL_PATH, CLASS_LABELS
 LABEL_COLUMN = "Label"
 IP_COLUMN = "Source IP"
 LABEL_ENCODER_PATH = os.path.join(os.path.dirname(MODEL_PATH), "label_encoder.pkl")
+ANOMALY_THRESHOLD_PATH = os.path.join(os.path.dirname(MODEL_PATH), "anomaly_threshold.txt")
 
 
 def load_split(name: str) -> pd.DataFrame:
@@ -57,6 +59,19 @@ def train_anomaly_detector(X_train, y_train):
         n_jobs=-1,
     )
     anomaly_model.fit(benign_only)
+
+    # Derive the threshold from the model's OWN score distribution on
+    # BENIGN data, matching the contamination=0.05 assumption above,
+    # instead of a hardcoded guess.
+    benign_scores = anomaly_model.score_samples(benign_only)
+    threshold = float(np.percentile(benign_scores, 5))
+
+    print(f"BENIGN score range: min={benign_scores.min():.3f}, max={benign_scores.max():.3f}, mean={benign_scores.mean():.3f}")
+    print(f"Computed anomaly threshold (5th percentile): {threshold:.3f}")
+
+    with open(ANOMALY_THRESHOLD_PATH, "w") as f:
+        f.write(str(threshold))
+
     return anomaly_model
 
 
@@ -68,9 +83,8 @@ def train():
     X_train, y_train = split_features_labels(train_df)
     X_test, y_test = split_features_labels(test_df)
 
-    # XGBoost needs numeric labels -- encode string classes to ints
     encoder = LabelEncoder()
-    encoder.fit(CLASS_LABELS)  # fixed order, consistent across runs
+    encoder.fit(CLASS_LABELS)
     y_train_encoded = encoder.transform(y_train)
     y_test_encoded = encoder.transform(y_test)
 
@@ -93,7 +107,7 @@ def train():
     anomaly_model = train_anomaly_detector(X_train, y_train)
 
     print("\nEvaluating anomaly detector on test set...")
-    anomaly_preds = anomaly_model.predict(X_test)  # -1 = anomaly, 1 = normal
+    anomaly_preds = anomaly_model.predict(X_test)
     flag_rate = (anomaly_preds == -1).mean()
     print(f"Flagged {flag_rate:.2%} of test traffic as anomalous")
 
@@ -109,6 +123,7 @@ def train():
     print(f"\nSaved: {MODEL_PATH}")
     print(f"Saved: {ANOMALY_MODEL_PATH}")
     print(f"Saved: {LABEL_ENCODER_PATH}")
+    print(f"Saved: {ANOMALY_THRESHOLD_PATH}")
 
     feature_columns_path = os.path.join(os.path.dirname(MODEL_PATH), "feature_columns.txt")
     with open(feature_columns_path, "w") as f:
