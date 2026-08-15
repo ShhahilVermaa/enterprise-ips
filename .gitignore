@@ -16,3 +16,7 @@ __pycache__/
 # IDE
 .vscode/
 .idea/
+# Generated ML model artifacts
+detection/models/
+
+dashboard/data.json
