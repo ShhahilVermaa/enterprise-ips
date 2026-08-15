@@ -1,5 +1,6 @@
 # Dataset
 data/raw/
+data/processed/
 
 # Trained ML models
 detection/models/*.pkl
