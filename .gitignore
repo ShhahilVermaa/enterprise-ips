@@ -18,3 +18,5 @@ __pycache__/
 .idea/
 # Generated ML model artifacts
 detection/models/
+
+dashboard/data.json

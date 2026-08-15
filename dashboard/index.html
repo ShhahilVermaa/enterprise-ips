@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Enterprise IPS — Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  body {
+    font-family: -apple-system, Segoe UI, Roboto, sans-serif;
+    background: #0f1117;
+    color: #e6e6e6;
+    margin: 0;
+    padding: 24px;
+  }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  .subtitle { color: #888; margin-bottom: 24px; font-size: 14px; }
+  .stats-row {
+    display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap;
+  }
+  .stat-card {
+    background: #1a1d27; border-radius: 10px; padding: 16px 20px;
+    flex: 1; min-width: 140px;
+  }
+  .stat-card .value { font-size: 28px; font-weight: 700; }
+  .stat-card .label { font-size: 13px; color: #999; margin-top: 4px; }
+  .stat-card.blocked .value { color: #ff5c5c; }
+  .stat-card.allowed .value { color: #4caf7c; }
+  .stat-card.anomaly .value { color: #f5a623; }
+  .panels { display: flex; gap: 20px; flex-wrap: wrap; }
+  .panel {
+    background: #1a1d27; border-radius: 10px; padding: 16px 20px;
+    flex: 1; min-width: 320px;
+  }
+  .panel h2 { font-size: 15px; margin: 0 0 12px 0; color: #ccc; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #2a2d38; }
+  th { color: #888; font-weight: 500; }
+  .badge {
+    padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600;
+  }
+  .badge.block { background: #3a1a1a; color: #ff5c5c; }
+  .badge.allow { background: #1a3a26; color: #4caf7c; }
+  canvas { max-height: 260px; }
+</style>
+</head>
+<body>
+
+<h1>🛡️ Enterprise IPS Dashboard</h1>
+<div class="subtitle" id="subtitle">Loading...</div>
+
+<div class="stats-row" id="statsRow"></div>
+
+<div class="panels">
+  <div class="panel">
+    <h2>Traffic by Attack Class</h2>
+    <canvas id="classChart"></canvas>
+  </div>
+  <div class="panel">
+    <h2>🚫 Recently Blocked IPs</h2>
+    <table id="blockedTable"><thead><tr><th>IP</th><th>Reason</th><th>Time</th></tr></thead><tbody></tbody></table>
+  </div>
+</div>
+
+<div class="panels" style="margin-top:20px;">
+  <div class="panel" style="flex: 2;">
+    <h2>📋 Recent Alerts</h2>
+    <table id="alertsTable">
+      <thead><tr><th>IP</th><th>True Label</th><th>Predicted</th><th>Risk</th><th>Action</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+async function loadDashboard() {
+  const res = await fetch('data.json');
+  const data = await res.json();
+
+  document.getElementById('subtitle').textContent =
+    `${data.total_processed.toLocaleString()} records processed`;
+
+  const statsRow = document.getElementById('statsRow');
+  statsRow.innerHTML = `
+    <div class="stat-card"><div class="value">${data.total_processed.toLocaleString()}</div><div class="label">Total Processed</div></div>
+    <div class="stat-card allowed"><div class="value">${data.allowed.toLocaleString()}</div><div class="label">Allowed</div></div>
+    <div class="stat-card blocked"><div class="value">${data.blocked.toLocaleString()}</div><div class="label">Blocked</div></div>
+    <div class="stat-card anomaly"><div class="value">${data.anomalous.toLocaleString()}</div><div class="label">Anomalous</div></div>
+  `;
+
+  const labels = Object.keys(data.class_breakdown);
+  const allowData = labels.map(l => data.class_breakdown[l].ALLOW || 0);
+  const blockData = labels.map(l => data.class_breakdown[l].BLOCK || 0);
+
+  new Chart(document.getElementById('classChart'), {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        { label: 'Allowed', data: allowData, backgroundColor: '#4caf7c' },
+        { label: 'Blocked', data: blockData, backgroundColor: '#ff5c5c' },
+      ]
+    },
+    options: {
+      responsive: true,
+      scales: { x: { stacked: true, ticks: { color: '#ccc' } }, y: { stacked: true, ticks: { color: '#ccc' } } },
+      plugins: { legend: { labels: { color: '#ccc' } } }
+    }
+  });
+
+  const blockedBody = document.querySelector('#blockedTable tbody');
+  data.blocked_ips.forEach(row => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${row.ip}</td><td>${row.reason}</td><td>${row.blocked_at}</td>`;
+    blockedBody.appendChild(tr);
+  });
+
+  const alertsBody = document.querySelector('#alertsTable tbody');
+  data.recent_alerts.forEach(row => {
+    const tr = document.createElement('tr');
+    const badge = row.action === 'BLOCK' ? 'block' : 'allow';
+    tr.innerHTML = `<td>${row.source_ip}</td><td>${row.true_label}</td><td>${row.predicted_class}</td>
+                     <td>${row.risk_score.toFixed(2)}</td><td><span class="badge ${badge}">${row.action}</span></td>`;
+    alertsBody.appendChild(tr);
+  });
+}
+
+loadDashboard();
+</script>
+</body>
+</html>
